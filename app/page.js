@@ -526,7 +526,14 @@ export default function Page() {
         if (data.baePlayers)        setBaePlayers(data.baePlayers);
         if (data.rawEggCategories)  setRawEggCategories(data.rawEggCategories);
         if (data.floridaCategories) setFloridaCategories(data.floridaCategories);
-        if (data.customGenerators)  setCustomGenerators(data.customGenerators);
+        if (data.customGenerators) {
+          const defaultCG = {
+            chaosSubjects:[], chaosActions:[], chaosContexts:[], chaosOutcomes:[],
+            floridaSubjects:[], floridaActions:[], floridaObjects:[],
+            prophecyCards:[], prophecyOmens:[], prophecyTimings:[],
+          };
+          setCustomGenerators({ ...defaultCG, ...data.customGenerators });
+        }
       }
       setSynced(true);
     });
@@ -546,17 +553,17 @@ export default function Page() {
 
   const sortedRoster  = useMemo(() => sortRosterBy(baePlayers, baeSort), [baePlayers, baeSort]);
   const metsBaeCounts = useMemo(() => getBaeVoteCounts(baePlayers, baeVoterChoice), [baePlayers, baeVoterChoice]);
-  const bestIndex     = useMemo(() => rowsWithProgress(PEOPLE.map((p) => [p,(trackers.glizzy[p]||0)*3+(trackers.sunCruiser[p]||0)*2])), [trackers]);
+  const bestIndex = useMemo(() => rowsWithProgress(PEOPLE.map((p) => [p,((trackers.glizzy||{})[p]||0)*3+((trackers.sunCruiser||{})[p]||0)*2])), [trackers]);
 
-  const glizzyRows     = rowsWithProgress(Object.entries(trackers.glizzy));
-  const sunCruiserRows = rowsWithProgress(Object.entries(trackers.sunCruiser));
-  const margaritaRows  = rowsWithProgress(Object.entries(trackers.margarita || {}));
-  const rawEggRows     = rowsWithProgress(Object.entries(trackers.rawEgg));
-  const floridaRows    = rowsWithProgress(Object.entries(trackers.florida));
+  const glizzyRows     = rowsWithProgress(Object.entries(trackers.glizzy     || {}));
+  const sunCruiserRows = rowsWithProgress(Object.entries(trackers.sunCruiser  || {}));
+  const margaritaRows  = rowsWithProgress(Object.entries(trackers.margarita   || {}));
+  const rawEggRows     = rowsWithProgress(Object.entries(trackers.rawEgg      || {}));
+  const floridaRows    = rowsWithProgress(Object.entries(trackers.florida     || {}));
   const metsBaeRows    = rowsWithProgress(Object.entries(metsBaeCounts));
-  const glizzyAchievements     = Object.fromEntries(Object.entries(trackers.glizzy).map(([n,v])     => [n, getAchievement(v, GLIZZY_LEVELS)]));
-  const sunCruiserAchievements = Object.fromEntries(Object.entries(trackers.sunCruiser).map(([n,v]) => [n, getAchievement(v, SUN_CRUISER_LEVELS)]));
-  const margaritaAchievements  = Object.fromEntries(Object.entries(trackers.margarita || {}).map(([n,v]) => [n, getAchievement(v, MARGARITA_LEVELS)]));
+  const glizzyAchievements     = Object.fromEntries(Object.entries(trackers.glizzy     || {}).map(([n,v]) => [n, getAchievement(v, GLIZZY_LEVELS)]));
+  const sunCruiserAchievements = Object.fromEntries(Object.entries(trackers.sunCruiser  || {}).map(([n,v]) => [n, getAchievement(v, SUN_CRUISER_LEVELS)]));
+  const margaritaAchievements  = Object.fromEntries(Object.entries(trackers.margarita   || {}).map(([n,v]) => [n, getAchievement(v, MARGARITA_LEVELS)]));
 
   const baeVoteSummaryRows = useMemo(() => {
     const tally = Object.entries(baeVoterChoice).reduce((acc,[person,player]) => {
@@ -579,12 +586,8 @@ export default function Page() {
   };
 
   const resetAllTrackers = () => {
-    // Selective reset — ask which trackers to zero
-    const choices = ["Glizzies","Sun Cruisers","Margaritas","Raw Egg","Florida","Mets Bae votes"];
-    const checked = {};
-    choices.forEach((c) => { checked[c] = false; });
     const selected = window.prompt(
-      `Which trackers should be zeroed?\nType any combo separated by commas:\n\n${choices.join(", ")}\n\n(or type ALL to reset everything)`
+      `Which trackers should be zeroed?\nType any combo separated by commas:\n\nGlizzies, Sun Cruisers, Margaritas, Raw Egg, Florida, Mets Bae votes\n\n(or type ALL to reset everything)`
     );
     if (!selected) return;
     const input = selected.trim().toLowerCase();
@@ -786,10 +789,6 @@ export default function Page() {
           40%  { transform:translate(calc(var(--dx)*.5),calc(var(--dy)*.5)) rotate(calc(var(--rot)*.4)) scale(1.1); }
           70%  { transform:translate(calc(var(--dx)*-.1),calc(var(--dy)*.9)) rotate(calc(var(--rot)*-.1)) scale(.95); }
           100% { transform:translate(var(--dx),var(--dy)) rotate(var(--rot)) scale(.7); opacity:0; }
-        }
-        @keyframes rainbowShift {
-          0%,100% { background-position:0% 50%; }
-          50%     { background-position:100% 50%; }
         }
         .lfgbtqm-bg {
           background: #fdf4ff;
@@ -1106,11 +1105,23 @@ export default function Page() {
                 </div>
 
                 <div className={`rounded-sm ${panelClass} p-4 shadow-sm ring-1 ring-slate-200`}>
-                  <div className="mb-3 text-lg tracking-[0.12em]" style={{ fontFamily:'"Bebas Neue",sans-serif' }}>GENERATOR DEFAULTS</div>
+                  <div className="mb-1 text-lg tracking-[0.12em]" style={{ fontFamily:'"Bebas Neue",sans-serif' }}>GENERATOR WORD BANKS</div>
+                  <div className="mb-3 text-xs text-slate-500">Add new options to each generator's random pool</div>
                   <div className="space-y-2">
-                    {["chaosSubjects","chaosActions","chaosContexts","chaosOutcomes","floridaSubjects","floridaActions","floridaObjects","prophecyCards","prophecyOmens","prophecyTimings"].map((key) => (
+                    {[
+                      ["chaosSubjects",   "Mets Chaos — who causes it"],
+                      ["chaosActions",    "Mets Chaos — what they do"],
+                      ["chaosContexts",   "Mets Chaos — when it happens"],
+                      ["chaosOutcomes",   "Mets Chaos — how it ends"],
+                      ["floridaSubjects", "Florida Shit — the person"],
+                      ["floridaActions",  "Florida Shit — what they do"],
+                      ["floridaObjects",  "Florida Shit — where/what with"],
+                      ["prophecyCards",   "Prophecy — the tarot card"],
+                      ["prophecyOmens",   "Prophecy — what it foretells"],
+                      ["prophecyTimings", "Prophecy — when it happens"],
+                    ].map(([key, label]) => (
                       <button key={key} onClick={() => addCustomGeneratorValue(key)} className="w-full rounded-sm bg-slate-100 px-4 py-2.5 text-left text-sm hover:bg-slate-200">
-                        Add to {key}
+                        + {label}
                       </button>
                     ))}
                   </div>
