@@ -209,7 +209,10 @@ function getAchievement(value, levels) {
 function getBaeVoteCounts(players, voterChoices) {
   const counts = {};
   players.map(formatPlayer).forEach((l) => { counts[l] = 0; });
-  Object.values(voterChoices).forEach((c) => { counts[c] = (counts[c] || 0) + 1; });
+  Object.values(voterChoices).forEach((c) => {
+    if (!c || !c.trim()) return; // skip blank votes
+    counts[c] = (counts[c] || 0) + 1;
+  });
   return counts;
 }
 function formatPlayer(p) { return `${p.number||"?"} ${p.first||""} ${p.last||""}`.trim(); }
@@ -464,7 +467,12 @@ export default function Page() {
       if (isWriting.current) return;
       const data = snapshot.val();
       if (data) {
-        if (data.trackers)          setTrackers(data.trackers);
+        if (data.trackers) {
+          // Merge to ensure margarita always has all 5 people
+          const merged = { ...DEFAULT_TRACKERS, ...data.trackers };
+          merged.margarita = { ...DEFAULT_TRACKERS.margarita, ...(data.trackers.margarita || {}) };
+          setTrackers(merged);
+        }
         if (data.baeVoterChoice)    setBaeVoterChoice(data.baeVoterChoice);
         if (data.baePlayers)        setBaePlayers(data.baePlayers);
         if (data.rawEggCategories)  setRawEggCategories(data.rawEggCategories);
