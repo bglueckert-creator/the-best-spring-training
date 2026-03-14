@@ -21,8 +21,8 @@ const db = getDatabase(firebaseApp);
 // ─── Constants ───────────────────────────────────────────────────────────────
 const PEOPLE = ["Brian", "Nick", "Ted", "Hailey", "Fe"];
 
-const CLOVER_PARK_LAT = 27.2731;
-const CLOVER_PARK_LNG = -80.3831;
+const CLOVER_PARK_LAT = 27.2935;
+const CLOVER_PARK_LNG = -80.3876;
 
 const INITIAL_BAE_PLAYERS = [
   { id: 1, number: "4",  first: "Francisco", last: "Alvarez" },
@@ -328,26 +328,21 @@ function ProgressRows({ rows, accentHex, achievements }) {
   );
 }
 
-function TrackerCard({ title, rows, action, onAction, fullWidth=false, tileClass, accentClass, accentHex }) {
+function TrackerCard({ title, rows, action, onAction, fullWidth=false, tileClass, accentClass, accentHex, achievements }) {
   return (
     <div className={`rounded-sm ${tileClass} p-4 shadow-sm ring-1 ring-slate-200/60 ${fullWidth?"col-span-2":""}`}>
       <div className="mb-3 text-lg tracking-[0.12em] text-slate-900" style={{ fontFamily:'"Bebas Neue",sans-serif' }}>{title}</div>
-      <ProgressRows rows={rows} accentHex={accentHex} />
+      <ProgressRows rows={rows} accentHex={accentHex} achievements={achievements} />
       {action && <button onClick={onAction} className={`mt-4 w-full rounded-sm px-4 py-3 text-sm font-medium tracking-widest transition-all active:scale-[0.98] ${accentClass}`}>{action}</button>}
     </div>
   );
 }
 
-// Distance tile with Clover Park default + live update on tap
 function DistanceTile({ title, destLat, destLng, mapsQuery, panelClass }) {
-  const [distMiles, setDistMiles] = useState(null);
-  const [loading, setLoading]     = useState(false);
+  const defaultDist = kmToMiles(distanceKm(CLOVER_PARK_LAT, CLOVER_PARK_LNG, destLat, destLng));
+  const [distMiles, setDistMiles] = useState(defaultDist);
   const [usedLive, setUsedLive]   = useState(false);
-
-  useEffect(() => {
-    const d = kmToMiles(distanceKm(CLOVER_PARK_LAT, CLOVER_PARK_LNG, destLat, destLng));
-    setDistMiles(d);
-  }, [destLat, destLng]);
+  const [loading, setLoading]     = useState(false);
 
   const handleTap = () => {
     openExternal(`https://www.google.com/maps/search/${encodeURIComponent(mapsQuery)}`);
@@ -364,7 +359,7 @@ function DistanceTile({ title, destLat, destLng, mapsQuery, panelClass }) {
     );
   };
 
-  const display  = distMiles !== null ? distMiles.toFixed(1) : "—";
+  const display  = distMiles.toFixed(1);
   const subtitle = loading ? "locating…" : usedLive ? "mi · from your location" : "mi · from Clover Park";
 
   return (
@@ -787,7 +782,12 @@ export default function Page() {
                 <StatTile title="TRIVIA"      icon={currentMode.tileEmojis[2]} onClick={() => setScreen("trivia")}    tileClass={tileClass} />
                 <StatTile title="USEFUL INFO" icon={currentMode.tileEmojis[3]} onClick={() => setScreen("useful")}    tileClass={tileClass} />
               </div>
-              <div className="mt-5 text-center"><div className="text-[7rem]">{currentMode.emoji}</div></div>
+              <div className="mt-5 text-center">
+                {mode === "margaritaville"
+                  ? <div className="text-[5rem] flex justify-center gap-2">🦜🍹</div>
+                  : <div className="text-[7rem]">{currentMode.emoji}</div>
+                }
+              </div>
               <div className={`mt-4 rounded-sm px-4 py-3 shadow-sm ring-1 ring-slate-200 ${panelClass}`}>
                 <div className="grid grid-cols-3 gap-2 text-[11px]">
                   {Object.entries(MODE_META).map(([key, value]) => (
@@ -831,7 +831,7 @@ export default function Page() {
                 <TrackerCard title="GLIZZY TRACKER"      rows={glizzyRows}     action="+ Add" onAction={() => openPersonDialog("glizzy",     "Who gets the Glizzy?")}      tileClass={tileClass} accentClass={currentMode.accent} accentHex={currentMode.accentHex} />
                 <TrackerCard title="SUN CRUISER TRACKER" rows={sunCruiserRows} action="+ Add" onAction={() => openPersonDialog("sunCruiser", "Who gets the Sun Cruiser?")} tileClass={tileClass} accentClass={currentMode.accent} accentHex={currentMode.accentHex} />
                 {mode === "margaritaville" && (
-                  <TrackerCard title="🍹 MARGARITA TRACKER" rows={margaritaRows} action="+ Add" onAction={() => openPersonDialog("margarita", "Who's got a margarita? 🍹")} tileClass={tileClass} accentClass={currentMode.accent} accentHex={currentMode.accentHex} />
+                  <TrackerCard title="🦜 MARGARITA TRACKER" rows={margaritaRows} action="+ Add" onAction={() => openPersonDialog("margarita", "Who's got a margarita? 🍹")} fullWidth tileClass={tileClass} accentClass={currentMode.accent} accentHex={currentMode.accentHex} achievements={margaritaAchievements} />
                 )}
                 <TrackerCard title="METS BAE" rows={metsBaeRows} action="Vote Bae" onAction={openBaeVoterDialog} fullWidth tileClass={tileClass} accentClass={currentMode.accent} accentHex={currentMode.accentHex} />
 
@@ -944,11 +944,11 @@ export default function Page() {
                 {/* Nearby chain restaurants — building emoji */}
                 <UsefulTile title="Nearby Chain Restaurants" icon={<span className="text-3xl">🍔</span>} onClick={openNearbyChainRestaurants} panelClass={panelClass} />
 
-                {/* Margaritaville distance */}
-                <DistanceTile title="Nearest Margaritaville" destLat={26.1224} destLng={-80.1373} mapsQuery="Margaritaville" panelClass={panelClass} />
+                {/* Margaritaville distance — Hollywood Beach FL */}
+                <DistanceTile title="Nearest Margaritaville" destLat={26.0112} destLng={-80.1295} mapsQuery="Margaritaville" panelClass={panelClass} />
 
-                {/* Cheesecake Factory distance */}
-                <DistanceTile title="Nearest Cheesecake Factory" destLat={26.6865} destLng={-80.0588} mapsQuery="Cheesecake Factory" panelClass={panelClass} />
+                {/* Cheesecake Factory distance — Palm Beach Gardens FL */}
+                <DistanceTile title="Nearest Cheesecake Factory" destLat={26.8401} destLng={-80.0757} mapsQuery="Cheesecake Factory" panelClass={panelClass} />
 
               </div>
             </>
@@ -1003,7 +1003,7 @@ export default function Page() {
                   <div key={key} className={`rounded-sm ${panelClass} p-4 shadow-sm ring-1 ring-slate-200`}>
                     <div className="mb-3 text-lg tracking-[0.12em]" style={{ fontFamily:'"Bebas Neue",sans-serif' }}>{label}</div>
                     <div className="space-y-2">
-                      {sortRowsWithRules(Object.entries(trackers[key])).map(([name, value]) => (
+                      {sortRowsWithRules(Object.entries(trackers[key] || {})).map(([name, value]) => (
                         <div key={name} className="flex items-center justify-between rounded-sm bg-slate-50 px-3 py-2">
                           <div className="text-sm">{name}</div>
                           <div className="flex items-center gap-2">
