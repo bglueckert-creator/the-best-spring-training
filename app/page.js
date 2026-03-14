@@ -169,9 +169,58 @@ const MODE_META = {
   },
 };
 
-const GLIZZY_LEVELS      = [{ min:0,label:"warming up"},{min:3,label:"snack mode"},{min:6,label:"glizzy threat"},{min:10,label:"glizzy legend"}];
-const SUN_CRUISER_LEVELS = [{ min:0,label:"dry dock"},{min:3,label:"cruising"},{min:6,label:"sun blasted"},{min:10,label:"captain of the cooler"}];
-const MARGARITA_LEVELS   = [{ min:0,label:"lime in hand"},{min:2,label:"salt on the rim"},{min:4,label:"five o'clock somewhere"},{min:7,label:"wasted away again"}];
+const GLIZZY_AWARDS = [
+  { min:0,  label:"Glizzy Virgin"     },
+  { min:1,  label:"Glizzy Curious"    },
+  { min:2,  label:"Glizzy Acquainted" },
+  { min:3,  label:"Glizzy Enthusiast" },
+  { min:4,  label:"Glizzy Committed"  },
+  { min:5,  label:"Glizzy Devotee"    },
+  { min:6,  label:"Glizzy Goblin"     },
+  { min:8,  label:"Glizzy Menace"     },
+  { min:10, label:"Glizzy Ascended"   },
+];
+const SUN_CRUISER_AWARDS = [
+  { min:0,  label:"Bone Dry"              },
+  { min:1,  label:"Slightly Moist"        },
+  { min:2,  label:"Damp Energy"           },
+  { min:3,  label:"Cruising"              },
+  { min:4,  label:"Sun Damaged"           },
+  { min:5,  label:"Deeply Sun Blasted"    },
+  { min:6,  label:"One With The Can"      },
+  { min:8,  label:"Legally A Beverage"    },
+  { min:10, label:"The Sun Cruiser Itself"},
+];
+const MARGARITA_AWARDS = [
+  { min:0,  label:"Sober In Florida (tragic)" },
+  { min:1,  label:"Lime Adjacent"             },
+  { min:2,  label:"Salt Rim Curious"          },
+  { min:3,  label:"Margarita Aware"           },
+  { min:4,  label:"Five O'Clock Somewhere"    },
+  { min:5,  label:"Tequila's Friend"          },
+  { min:6,  label:"Wasted Away Again"         },
+  { min:8,  label:"Lost Shaker Of Salt"       },
+  { min:10, label:"Jimmy Buffett's Ghost"     },
+];
+const RAW_EGG_AWARDS = [
+  { min:0, label:"Egg Blind"         },
+  { min:1, label:"Egg Adjacent"      },
+  { min:2, label:"Egg Spotter"       },
+  { min:3, label:"Egg Correspondent" },
+  { min:5, label:"Egg Journalist"    },
+];
+const FLORIDA_AWARDS = [
+  { min:0, label:"Transplant Energy"            },
+  { min:1, label:"Florida Curious"              },
+  { min:2, label:"Florida Aware"                },
+  { min:3, label:"Florida Man Adjacent"         },
+  { min:5, label:"Born In A Publix Parking Lot" },
+];
+
+// Keep old level names for tracker card subtitles
+const GLIZZY_LEVELS      = GLIZZY_AWARDS;
+const SUN_CRUISER_LEVELS = SUN_CRUISER_AWARDS;
+const MARGARITA_LEVELS   = MARGARITA_AWARDS;
 
 const JIMMY_BUFFETT_LINES = [
   "Wasted away again in Margaritaville.",
@@ -1013,11 +1062,14 @@ export default function Page() {
                     <div className="space-y-2">
                       {sortRowsWithRules(Object.entries(trackers[key] || {})).map(([name, value]) => (
                         <div key={name} className="flex items-center justify-between rounded-sm bg-slate-50 px-3 py-2">
-                          <div className="text-sm">{name}</div>
+                          <div className="text-sm flex-1">{name}</div>
                           <div className="flex items-center gap-2">
                             <button className={`rounded-sm px-3 py-1 ${currentMode.accent}`} onClick={() => decrementTracker(key, name)}>−</button>
                             <div className="w-10 text-center text-lg" style={{ fontFamily:'"Orbitron",monospace' }}>{value}</div>
                             <button className={`rounded-sm px-3 py-1 ${currentMode.accent}`} onClick={() => incrementTracker(key, name)}>+</button>
+                            {(key === "rawEgg" || key === "florida") && (
+                              <button className="rounded-sm bg-red-100 px-2 py-1 text-xs text-red-600 hover:bg-red-200" onClick={() => deleteCategory(key, name, key === "rawEgg" ? setRawEggCategories : setFloridaCategories)}>✕</button>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -1091,7 +1143,54 @@ export default function Page() {
               <button className="mb-4 text-sm text-slate-500 hover:text-slate-800" onClick={() => setScreen("home")}>← Back</button>
               <SectionTitle>THE BEST LEADERBOARD</SectionTitle>
               <div className="space-y-3">
-                {[["THE BEST INDEX",bestIndex,null],["METS BAE VOTES",metsBaeRows,null],["GLIZZIES",glizzyRows,glizzyAchievements],["SUN CRUISERS",sunCruiserRows,sunCruiserAchievements],["RAW EGG",rawEggRows,null]].map(([title,rows,achievements]) => (
+
+                {/* Best Index */}
+                <div className={`rounded-sm ${panelClass} p-4 shadow-sm ring-1 ring-slate-200`}>
+                  <div className="mb-3 text-lg tracking-[0.12em]" style={{ fontFamily:'"Bebas Neue",sans-serif' }}>THE BEST INDEX</div>
+                  <ProgressRows rows={bestIndex} accentHex={currentMode.accentHex} />
+                </div>
+
+                {/* Awards — one card per person */}
+                <div className={`rounded-sm ${panelClass} p-4 shadow-sm ring-1 ring-slate-200`}>
+                  <div className="mb-3 text-lg tracking-[0.12em]" style={{ fontFamily:'"Bebas Neue",sans-serif' }}>🏆 AWARDS</div>
+                  <div className="space-y-4">
+                    {PEOPLE.map((person) => {
+                      const g  = trackers.glizzy?.[person]     || 0;
+                      const sc = trackers.sunCruiser?.[person] || 0;
+                      const mg = trackers.margarita?.[person]  || 0;
+                      const re = Object.values(trackers.rawEgg  || {}).reduce((a,b)=>a+b,0);
+                      const fl = Object.values(trackers.florida || {}).reduce((a,b)=>a+b,0);
+                      const awards = [
+                        { emoji:"🌭", label: getAchievement(g,  GLIZZY_AWARDS),       count: g  },
+                        { emoji:"☀️", label: getAchievement(sc, SUN_CRUISER_AWARDS),  count: sc },
+                        { emoji:"🍹", label: getAchievement(mg, MARGARITA_AWARDS),    count: mg },
+                        { emoji:"🥚", label: getAchievement(re, RAW_EGG_AWARDS),      count: re },
+                        { emoji:"🌴", label: getAchievement(fl, FLORIDA_AWARDS),      count: fl },
+                      ];
+                      return (
+                        <div key={person} className="rounded-sm bg-white/60 ring-1 ring-slate-200/60 overflow-hidden">
+                          <div className="px-3 py-2 font-semibold text-slate-900 tracking-[0.08em] text-sm border-b border-slate-100" style={{ fontFamily:'"Bebas Neue",sans-serif', fontSize:"1.1rem" }}>
+                            {person}
+                          </div>
+                          <div className="divide-y divide-slate-100">
+                            {awards.map(({ emoji, label, count }) => (
+                              <div key={emoji} className="flex items-center justify-between px-3 py-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-lg">{emoji}</span>
+                                  <span className="text-xs text-slate-500 italic">{label}</span>
+                                </div>
+                                <span className="text-sm tabular-nums text-slate-700" style={{ fontFamily:'"Orbitron",monospace' }}>{String(count).padStart(2,"0")}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Tracker summaries */}
+                {[["METS BAE VOTES",metsBaeRows,null],["GLIZZIES",glizzyRows,glizzyAchievements],["SUN CRUISERS",sunCruiserRows,sunCruiserAchievements],["RAW EGG",rawEggRows,null]].map(([title,rows,achievements]) => (
                   <div key={title} className={`rounded-sm ${panelClass} p-4 shadow-sm ring-1 ring-slate-200`}>
                     <div className="mb-3 text-lg tracking-[0.12em]" style={{ fontFamily:'"Bebas Neue",sans-serif' }}>{title}</div>
                     <ProgressRows rows={rows} accentHex={currentMode.accentHex} achievements={achievements} />
