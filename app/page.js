@@ -886,7 +886,7 @@ export default function Page() {
 
                 {/* Right — Spotify */}
                 <button
-                  onClick={() => openExternal("https://open.spotify.com/playlist/56mbqRtoOFVP7cYyfrpZpH")}
+                  onClick={() => openExternal("https://open.spotify.com/embed/playlist/56mbqRtoOFVP7cYyfrpZpH")}
                   className={`flex flex-col items-center justify-center rounded-sm px-3 py-4 shadow-sm ring-1 ring-slate-200 shrink-0 w-16 ${panelClass}`}
                 >
                   <svg viewBox="0 0 24 24" className="w-8 h-8" fill="#1DB954">
