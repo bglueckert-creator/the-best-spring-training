@@ -41,12 +41,13 @@ const DEFAULT_TRACKERS = {
   florida:     { "SHIRTLESS MAN": 0, "TRUMP SIGN": 0, "LIVE LAUGH LOVE ENERGY": 0 },
 };
 
-const DEFAULT_BAE_VOTERS = {
-  Brian:  "4 Francisco Alvarez",
-  Nick:   "27 Mark Vientos",
-  Ted:    "22 Juan Soto",
-  Hailey: "4 Francisco Alvarez",
-  Fe:     "27 Mark Vientos",
+const DEFAULT_BAE_VOTES = {};
+// Multi-vote model: { "27 Mark Vientos": { Brian: 2, Nick: 1 }, ... }
+// Seeded with initial single votes converted to counts
+const INITIAL_BAE_VOTES = {
+  "4 Francisco Alvarez": { Brian: 1, Hailey: 1 },
+  "27 Mark Vientos":     { Nick: 1, Fe: 1 },
+  "22 Juan Soto":        { Ted: 1 },
 };
 
 const DEFAULT_RAW_EGG_CATEGORIES = ["RAW EGG", "ADJACENT"];
@@ -255,12 +256,13 @@ function getAchievement(value, levels) {
   for (const l of levels) { if (value >= l.min) cur = l.label; }
   return cur;
 }
-function getBaeVoteCounts(players, voterChoices) {
+function getBaeVoteCounts(players, baeVotes) {
   const counts = {};
   players.map(formatPlayer).forEach((l) => { counts[l] = 0; });
-  Object.values(voterChoices).forEach((c) => {
-    if (!c || !c.trim()) return; // skip blank votes
-    counts[c] = (counts[c] || 0) + 1;
+  Object.entries(baeVotes || {}).forEach(([player, voterMap]) => {
+    if (!player || !player.trim()) return;
+    const total = Object.values(voterMap || {}).reduce((a, b) => a + (Number(b) || 0), 0);
+    counts[player] = (counts[player] || 0) + total;
   });
   return counts;
 }
@@ -501,7 +503,7 @@ export default function Page() {
   const [rawEggCategories, setRawEggCategories]   = useState(DEFAULT_RAW_EGG_CATEGORIES);
   const [floridaCategories, setFloridaCategories] = useState(DEFAULT_FLORIDA_CATEGORIES);
   const [trackers, setTrackers]                   = useState(DEFAULT_TRACKERS);
-  const [baeVoterChoice, setBaeVoterChoice]       = useState(DEFAULT_BAE_VOTERS);
+  const [baeVotes, setBaeVotes]                   = useState(INITIAL_BAE_VOTES);
   const [customGenerators, setCustomGenerators]   = useState({
     chaosSubjects:[], chaosActions:[], chaosContexts:[], chaosOutcomes:[],
     floridaSubjects:[], floridaActions:[], floridaObjects:[],
@@ -522,7 +524,7 @@ export default function Page() {
           merged.margarita = { ...DEFAULT_TRACKERS.margarita, ...(data.trackers.margarita || {}) };
           setTrackers(merged);
         }
-        if (data.baeVoterChoice)    setBaeVoterChoice(data.baeVoterChoice);
+        if (data.baeVotes)          setBaeVotes(data.baeVotes);
         if (data.baePlayers)        setBaePlayers(data.baePlayers);
         if (data.rawEggCategories)  setRawEggCategories(data.rawEggCategories);
         if (data.floridaCategories) setFloridaCategories(data.floridaCategories);
@@ -552,7 +554,7 @@ export default function Page() {
   const panelClass  = isLfgbtqm ? "lfgbtqm-panel" : currentMode.panel;
 
   const sortedRoster  = useMemo(() => sortRosterBy(baePlayers, baeSort), [baePlayers, baeSort]);
-  const metsBaeCounts = useMemo(() => getBaeVoteCounts(baePlayers, baeVoterChoice), [baePlayers, baeVoterChoice]);
+  const metsBaeCounts = useMemo(() => getBaeVoteCounts(baePlayers, baeVotes), [baePlayers, baeVotes]);
   const bestIndex = useMemo(() => rowsWithProgress(PEOPLE.map((p) => [p,((trackers.glizzy||{})[p]||0)*3+((trackers.sunCruiser||{})[p]||0)*2])), [trackers]);
 
   const glizzyRows     = rowsWithProgress(Object.entries(trackers.glizzy     || {}));
@@ -566,13 +568,16 @@ export default function Page() {
   const margaritaAchievements  = Object.fromEntries(Object.entries(trackers.margarita   || {}).map(([n,v]) => [n, getAchievement(v, MARGARITA_LEVELS)]));
 
   const baeVoteSummaryRows = useMemo(() => {
-    const tally = Object.entries(baeVoterChoice).reduce((acc,[person,player]) => {
-      if (!player || !player.trim()) return acc; // skip blank votes
-      acc[player] = acc[player] || { votes:0, people:[] };
-      acc[player].votes++; acc[player].people.push(person); return acc;
-    }, {});
-    return Object.entries(tally).filter(([,i]) => i.votes>0).sort((a,b) => b[1].votes-a[1].votes || a[0].localeCompare(b[0]));
-  }, [baeVoterChoice]);
+    // Build { playerLabel: { total, voterBreakdown: [{name, count}] } }
+    const summary = {};
+    Object.entries(baeVotes || {}).forEach(([player, voterMap]) => {
+      if (!player || !player.trim()) return;
+      const voters = Object.entries(voterMap || {}).filter(([,c]) => (Number(c)||0) > 0);
+      const total  = voters.reduce((a,[,c]) => a + (Number(c)||0), 0);
+      if (total > 0) summary[player] = { total, voters };
+    });
+    return Object.entries(summary).sort((a,b) => b[1].total - a[1].total);
+  }, [baeVotes]);
 
   const handleModeChange = (nextMode) => { setMode(nextMode); setModeSplash(nextMode); setTimeout(() => setModeSplash(null), 3000); };
 
@@ -603,9 +608,8 @@ export default function Page() {
 
     const patch = { trackers: nextTrackers };
     if (wants("bae") || wants("mets")) {
-      const zeroedBae = Object.fromEntries(Object.keys(baeVoterChoice).map((k) => [k,""]));
-      setBaeVoterChoice(zeroedBae);
-      patch.baeVoterChoice = zeroedBae;
+      setBaeVotes({});
+      patch.baeVotes = {};
     }
     setTrackers(nextTrackers);
     pushToFirebase(patch);
@@ -615,12 +619,10 @@ export default function Page() {
     if (!window.confirm(`Remove ${playerLabel} from the roster?`)) return;
     const nextPlayers = baePlayers.filter((p) => formatPlayer(p) !== playerLabel);
     setBaePlayers(nextPlayers);
-    // Clear any votes for this player
-    const nextVotes = Object.fromEntries(
-      Object.entries(baeVoterChoice).map(([voter, choice]) => [voter, choice === playerLabel ? "" : choice])
-    );
-    setBaeVoterChoice(nextVotes);
-    pushToFirebase({ baePlayers: nextPlayers, baeVoterChoice: nextVotes });
+    const nextVotes = { ...baeVotes };
+    delete nextVotes[playerLabel];
+    setBaeVotes(nextVotes);
+    pushToFirebase({ baePlayers: nextPlayers, baeVotes: nextVotes });
   };
 
   const deleteCategory = (trackerKey, categoryName, setCategories) => {
@@ -668,7 +670,7 @@ export default function Page() {
         const roster = sortRosterBy(baePlayers, baeSort).map(formatPlayer);
         setDialog({
           type: "bae-pick",
-          title: `${voter} picks Mets Bae`,
+          title: `${voter} votes for Mets Bae`,
           options: [...roster, "➕ Add a player"],
           onChoose: (choice) => {
             if (choice === "➕ Add a player") {
@@ -680,19 +682,20 @@ export default function Page() {
               setBaePlayers(nextPlayers);
               pushToFirebase({ baePlayers: nextPlayers });
               const newLabel = formatPlayer(newPlayer);
-              const next = { ...baeVoterChoice, [voter]: newLabel };
-              setBaeVoterChoice(next);
-              pushToFirebase({ baeVoterChoice: next });
+              const nextVotes = { ...baeVotes, [newLabel]: { ...(baeVotes[newLabel] || {}), [voter]: ((baeVotes[newLabel]||{})[voter]||0) + 1 } };
+              setBaeVotes(nextVotes);
+              pushToFirebase({ baeVotes: nextVotes });
               return;
             }
-            const next = { ...baeVoterChoice, [voter]: choice };
-            setBaeVoterChoice(next);
-            pushToFirebase({ baeVoterChoice: next });
+            // Add one vote for this voter on this player
+            const nextVotes = { ...baeVotes, [choice]: { ...(baeVotes[choice] || {}), [voter]: ((baeVotes[choice]||{})[voter]||0) + 1 } };
+            setBaeVotes(nextVotes);
+            pushToFirebase({ baeVotes: nextVotes });
           },
         });
       },
     });
-  }, [baePlayers, baeSort, baeVoterChoice, pushToFirebase]);
+  }, [baePlayers, baeSort, baeVotes, pushToFirebase]);
 
   // Close dialog first, then call handler so second dialog can open cleanly
   const handleDialogSelect = (option) => {
@@ -855,24 +858,41 @@ export default function Page() {
                   ))}
                 </div>
               </div>
-              <div className="mt-5 grid grid-cols-3 items-stretch gap-3">
-                <button onClick={() => setScreen("leaderboard")}
-                  className={`flex items-center justify-center rounded-sm px-3 py-4 text-center text-xl tracking-[0.12em] text-slate-700 shadow-sm ring-1 ring-slate-200 ${panelClass}`}
-                  style={{ fontFamily:'"Bebas Neue",sans-serif' }}>
-                  LEADERBOARD
-                </button>
-                <div className={`flex flex-col items-center justify-center rounded-sm px-3 py-4 shadow-sm ring-1 ring-slate-200 ${panelClass}`}>
+              {/* Bottom row: logos | leaderboard + steve cohen | spotify */}
+              <div className="mt-5 flex items-stretch gap-3">
+                {/* Left — Mets + Glue logos */}
+                <div className={`flex flex-col items-center justify-center rounded-sm px-3 py-4 shadow-sm ring-1 ring-slate-200 shrink-0 w-16 ${panelClass}`}>
                   <button onClick={() => openExternal("https://www.mlb.com/mets")}>
-                    <img src="/mets-ny.png" alt="Mets NY" className="mx-auto h-16 w-24 object-contain" />
+                    <img src="/mets-ny.png" alt="Mets NY" className="mx-auto h-10 w-10 object-contain" />
                   </button>
-                  <button onClick={() => openExternal("https://www.gluearch.com")} className="mt-3">
-                    <img src="/glue-logo.png" alt="GLUE" className="mx-auto object-contain opacity-50" style={{height:"14px",width:"54px"}} />
+                  <button onClick={() => openExternal("https://www.gluearch.com")} className="mt-2">
+                    <img src="/glue-logo.png" alt="GLUE" className="mx-auto object-contain opacity-50" style={{height:"10px",width:"40px"}} />
                   </button>
                 </div>
-                <button onClick={() => setScreen("admin")}
-                  className={`flex items-center justify-center rounded-sm px-3 py-4 text-center text-xl tracking-[0.12em] text-slate-700 shadow-sm ring-1 ring-slate-200 ${panelClass}`}
-                  style={{ fontFamily:'"Bebas Neue",sans-serif' }}>
-                  STEVE COHEN MODE
+
+                {/* Middle — Leaderboard stacked over Steve Cohen Mode */}
+                <div className="flex flex-col gap-2 flex-1">
+                  <button onClick={() => setScreen("leaderboard")}
+                    className={`flex flex-1 items-center justify-center rounded-sm px-3 py-3 text-center text-xl tracking-[0.12em] text-slate-700 shadow-sm ring-1 ring-slate-200 ${panelClass}`}
+                    style={{ fontFamily:'"Bebas Neue",sans-serif' }}>
+                    LEADERBOARD
+                  </button>
+                  <button onClick={() => setScreen("admin")}
+                    className={`flex flex-1 items-center justify-center rounded-sm px-3 py-3 text-center text-xl tracking-[0.12em] text-slate-700 shadow-sm ring-1 ring-slate-200 ${panelClass}`}
+                    style={{ fontFamily:'"Bebas Neue",sans-serif' }}>
+                    STEVE COHEN MODE
+                  </button>
+                </div>
+
+                {/* Right — Spotify */}
+                <button
+                  onClick={() => openExternal("https://open.spotify.com/playlist/56mbqRtoOFVP7cYyfrpZpH")}
+                  className={`flex flex-col items-center justify-center rounded-sm px-3 py-4 shadow-sm ring-1 ring-slate-200 shrink-0 w-16 ${panelClass}`}
+                >
+                  <svg viewBox="0 0 24 24" className="w-8 h-8" fill="#1DB954">
+                    <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+                  </svg>
+                  <div className="mt-1 text-[9px] tracking-widest text-slate-600" style={{ fontFamily:'"Bebas Neue",sans-serif' }}>PLAYLIST</div>
                 </button>
               </div>
             </>
@@ -1074,10 +1094,12 @@ export default function Page() {
                           <div className="text-sm flex-1">{label}</div>
                           <div className="flex items-center gap-2">
                             <button className={`rounded-sm px-3 py-1 ${currentMode.accent}`} onClick={() => {
-                              const voter = Object.keys(baeVoterChoice).find((n) => baeVoterChoice[n] === label);
-                              if (!voter) return;
-                              const next = { ...baeVoterChoice, [voter]: "" };
-                              setBaeVoterChoice(next); pushToFirebase({ baeVoterChoice: next });
+                              // Remove one vote from whoever voted most recently for this player
+                              const voterMap = baeVotes[label] || {};
+                              const topVoter = Object.entries(voterMap).filter(([,c])=>(Number(c)||0)>0).sort((a,b)=>b[1]-a[1])[0];
+                              if (!topVoter) return;
+                              const nextVotes = { ...baeVotes, [label]: { ...voterMap, [topVoter[0]]: Math.max(0, (Number(voterMap[topVoter[0]])||0) - 1) } };
+                              setBaeVotes(nextVotes); pushToFirebase({ baeVotes: nextVotes });
                             }}>−</button>
                             <div className="w-10 text-center text-lg" style={{ fontFamily:'"Orbitron",monospace' }}>{count}</div>
                             <button className={`rounded-sm px-3 py-1 ${currentMode.accent}`} onClick={openBaeVoterDialog}>+</button>
@@ -1095,10 +1117,17 @@ export default function Page() {
                     {baeVoteSummaryRows.map(([player, info]) => (
                       <div key={player} className="rounded-sm bg-slate-50 px-3 py-2">
                         <div className="flex items-center justify-between">
-                          <div className="text-sm text-slate-900">{player}</div>
-                          <div className="text-sm text-slate-500">{info.votes} vote{info.votes!==1?"s":""}</div>
+                          <div className="text-sm font-medium text-slate-900">{player}</div>
+                          <div className="text-sm text-slate-500">{info.total} vote{info.total!==1?"s":""}</div>
                         </div>
-                        <div className="mt-1 text-xs text-slate-600">{info.people.join(", ")}</div>
+                        <div className="mt-1 space-y-0.5">
+                          {info.voters.map(([name, count]) => (
+                            <div key={name} className="flex items-center justify-between text-xs text-slate-600">
+                              <span>{name}</span>
+                              <span>{count}×</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
