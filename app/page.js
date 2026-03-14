@@ -892,32 +892,18 @@ export default function Page() {
                 )}
                 <TrackerCard title="METS BAE" rows={metsBaeRows} action="Vote Bae" onAction={openBaeVoterDialog} fullWidth tileClass={tileClass} accentClass={currentMode.accent} accentHex={currentMode.accentHex} />
 
-                {/* Raw Egg with delete category */}
+                {/* Raw Egg tracker */}
                 <div className={`rounded-sm ${tileClass} p-4 shadow-sm ring-1 ring-slate-200/60`}>
                   <div className="mb-3 text-lg tracking-[0.12em] text-slate-900" style={{ fontFamily:'"Bebas Neue",sans-serif' }}>RAW EGG TRACKER</div>
                   <ProgressRows rows={rawEggRows} accentHex={currentMode.accentHex} />
                   <button onClick={() => openCategoryDialog("rawEgg","Select category",rawEggCategories,setRawEggCategories)} className={`mt-4 w-full rounded-sm px-4 py-3 text-sm font-medium tracking-widest ${currentMode.accent}`}>+ Add</button>
-                  <div className="mt-2 space-y-1">
-                    {rawEggCategories.map((cat) => (
-                      <button key={cat} onClick={() => deleteCategory("rawEgg", cat, setRawEggCategories)} className="w-full rounded-sm bg-slate-100 px-3 py-1.5 text-left text-xs text-slate-500 hover:bg-red-50 hover:text-red-600">
-                        ✕ {cat}
-                      </button>
-                    ))}
-                  </div>
                 </div>
 
-                {/* Florida with delete category */}
+                {/* Florida tracker */}
                 <div className={`rounded-sm ${tileClass} p-4 shadow-sm ring-1 ring-slate-200/60`}>
                   <div className="mb-3 text-lg tracking-[0.12em] text-slate-900" style={{ fontFamily:'"Bebas Neue",sans-serif' }}>FLORIDA TRACKER</div>
                   <ProgressRows rows={floridaRows} accentHex={currentMode.accentHex} />
                   <button onClick={() => openCategoryDialog("florida","Select category",floridaCategories,setFloridaCategories)} className={`mt-4 w-full rounded-sm px-4 py-3 text-sm font-medium tracking-widest ${currentMode.accent}`}>+ Add</button>
-                  <div className="mt-2 space-y-1">
-                    {floridaCategories.map((cat) => (
-                      <button key={cat} onClick={() => deleteCategory("florida", cat, setFloridaCategories)} className="w-full rounded-sm bg-slate-100 px-3 py-1.5 text-left text-xs text-slate-500 hover:bg-red-50 hover:text-red-600">
-                        ✕ {cat}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               </div>
             </>
